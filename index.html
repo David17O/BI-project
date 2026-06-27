@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Schweizer Hotellerie BI-Dashboard – FHNW BI 2025/26</title>
+<!-- Keine externe Bibliothek – native Canvas 2D API -->
+<style>
+/* ============================================================
+   DESIGN SYSTEM – konsistente Farbpalette & Typografie
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:       #0f172a;
+  --surface:  #1e293b;
+  --surface2: #253347;
+  --border:   #334155;
+  --accent:   #0ea5e9;
+  --accent2:  #06b6d4;
+  --text:     #f1f5f9;
+  --muted:    #94a3b8;
+  --pos:      #10b981;
+  --neg:      #ef4444;
+  --warn:     #f59e0b;
+  --purple:   #8b5cf6;
+}
+body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
+
+/* HEADER */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 1rem 1.5rem;
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;
+}
+.header-title h1 { font-size: 1.2rem; font-weight: 700; }
+.header-title h1 span { color: var(--accent); }
+.header-title p  { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+
+/* CONTROLS – OLAP-Filter */
+.controls { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+.ctrl-group { display: flex; align-items: center; gap: 0.4rem; }
+.ctrl-group label { font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
+select {
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer;
+}
+select:hover { border-color: var(--accent); }
+
+/* MAIN LAYOUT */
+main { padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; max-width: 1600px; margin: 0 auto; }
+
+/* KPI CARDS */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(195px, 1fr)); gap: 1rem; }
+.kpi-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.1rem 1.25rem; position: relative; overflow: hidden;
+}
+.kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--kpi-color, var(--accent)); }
+.kpi-label  { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.45rem; }
+.kpi-value  { font-size: 1.9rem; font-weight: 800; line-height: 1; color: var(--kpi-color, var(--accent)); }
+.kpi-delta  { font-size: 0.78rem; margin-top: 0.4rem; }
+.kpi-delta.pos  { color: var(--pos); }
+.kpi-delta.neg  { color: var(--neg); }
+.kpi-formula{ font-size: 0.65rem; color: var(--muted); margin-top: 0.35rem; font-style: italic; }
+
+/* CHART CARDS */
+.row-2 { display: grid; grid-template-columns: 3fr 2fr; gap: 1.25rem; }
+.row-equal { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem 1.25rem;
+}
+.card-head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 0.9rem; flex-wrap: wrap; gap: 0.4rem;
+}
+.card-head strong { font-size: 0.82rem; color: var(--text); }
+.tag {
+  font-size: 0.62rem; background: rgba(14,165,233,0.12); border: 1px solid rgba(14,165,233,0.25);
+  border-radius: 3px; padding: 0.12rem 0.45rem; color: var(--accent2); white-space: nowrap;
+}
+.chart-wrap { position: relative; height: 265px; }
+
+/* HEATMAP */
+.heatmap-wrap { overflow-x: auto; }
+table.hm { width: 100%; border-collapse: collapse; font-size: 0.68rem; }
+table.hm th, table.hm td { padding: 0.35rem 0.4rem; text-align: center; border: 1px solid var(--border); }
+table.hm th { color: var(--muted); font-weight: 600; background: var(--bg); }
+table.hm .canton-cell { text-align: left; color: var(--text); font-weight: 500; white-space: nowrap; }
+
+/* AI PANEL */
+.ai-panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-image: linear-gradient(135deg, var(--accent), var(--purple)) 1;
+  border-radius: 10px; padding: 1.25rem 1.5rem;
+}
+.ai-badge {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  background: rgba(14,165,233,0.1); border: 1px solid var(--accent);
+  border-radius: 20px; padding: 0.2rem 0.75rem; font-size: 0.7rem; color: var(--accent);
+  margin-bottom: 0.75rem;
+}
+.ai-note { font-size: 0.72rem; color: var(--muted); margin-bottom: 0.9rem; }
+#aiBtn {
+  background: linear-gradient(135deg, #0ea5e9, #8b5cf6);
+  border: none; color: white; padding: 0.5rem 1.1rem; border-radius: 6px;
+  cursor: pointer; font-size: 0.82rem; margin-bottom: 1rem; font-weight: 600;
+}
+#aiBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ai-out { font-size: 0.88rem; line-height: 1.75; color: var(--text); }
+.ai-out strong { color: var(--accent); }
+
+/* DRILL TABLE */
+table.drill { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+table.drill th { padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); color: var(--muted); font-weight: 600; text-align: center; }
+table.drill th:first-child { text-align: left; }
+table.drill td { padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--border); text-align: center; }
+table.drill td:first-child { text-align: left; color: var(--accent); font-weight: 600; }
+table.drill .total-col { color: var(--accent); font-weight: 700; }
+table.drill tr:last-child td { border-bottom: none; }
+
+/* FOOTER */
+footer {
+  background: var(--surface); border-top: 1px solid var(--border);
+  padding: 0.85rem 1.5rem; font-size: 0.68rem; color: var(--muted);
+  display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: space-between; align-items: center;
+}
+.badge {
+  display: inline-block; background: rgba(14,165,233,0.1); border: 1px solid rgba(14,165,233,0.2);
+  border-radius: 4px; padding: 0.12rem 0.45rem; font-size: 0.65rem; color: var(--accent); margin: 0.1rem;
+}
+
+@media (max-width: 900px) {
+  .row-2, .row-equal { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     HEADER: Titel + OLAP-Filter (Slice & Dice Controls)
+     OLAP-Konzept: Der User wählt Dimensionswerte → alle Charts
+     aktualisieren sich konsistent (Slice entlang Zeit/Region/Herkunft)
+     ============================================================ -->
+<header>
+  <div class="header-title">
+    <h1>🏔 Schweizer Hotellerie <span>BI-Dashboard</span></h1>
+    <p>FHNW BI-Modul 2025/26 · Prof. Dr. Manuel Renold · Datenquelle: BFS HESTA · Snapshot: 2024-12-01</p>
+  </div>
+  <div class="controls">
+    <div class="ctrl-group">
+      <label>Jahr (OLAP-Slice):</label>
+      <select id="selYear"></select>
+    </div>
+    <div class="ctrl-group">
+      <label>Kantonsgruppe (Drill-Down):</label>
+      <select id="selRegion">
+        <option value="ALL">Alle Kantone</option>
+        <option value="MOUNTAIN">Bergkantone (GR, VS)</option>
+        <option value="CITY">Stadtkantone (ZH, GE, BS)</option>
+        <option value="LAKE">Seen/Alpen (BE, LU, TI)</option>
+      </select>
+    </div>
+    <div class="ctrl-group">
+      <label>Herkunft (Dice):</label>
+      <select id="selOrigin">
+        <option value="TOTAL">Gesamt</option>
+        <option value="DOM">Inland</option>
+        <option value="INTL">Ausland</option>
+      </select>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- KPI-Zeile -->
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <!-- Chart-Zeile 1: Zeitreihe + Kanton-Bar -->
+  <div class="row-2">
+    <div class="card">
+      <div class="card-head">
+        <strong>Monatliche Logiernächte 2018–2024 + Forecast 2025</strong>
+        <span class="tag">Forecasting · Holt-Winters · Saisonale Dekomposition</span>
+      </div>
+      <div class="chart-wrap"><canvas id="chartTrend"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <strong>Logiernächte nach Kanton (ausgewähltes Jahr)</strong>
+        <span class="tag">OLAP Drill-Down · Region → Kanton</span>
+      </div>
+      <div class="chart-wrap"><canvas id="chartCanton"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Chart-Zeile 2: Herkunft-Stack + Heatmap -->
+  <div class="row-equal">
+    <div class="card">
+      <div class="card-head">
+        <strong>Inland vs. Ausland nach Kanton (Stacked)</strong>
+        <span class="tag">Dimensionsanalyse · Herkunfts-Dimension</span>
+      </div>
+      <div class="chart-wrap"><canvas id="chartOrigin"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <strong>Saisonalitäts-Heatmap: Monat × Kanton</strong>
+        <span class="tag">OLAP Dice · Zeit × Region</span>
+      </div>
+      <div class="heatmap-wrap" id="heatmapWrap"></div>
+    </div>
+  </div>
+
+  <!-- Agentic BI Panel -->
+  <div class="ai-panel">
+    <div class="ai-badge">✦ Agentic BI · Natural Language Insights</div>
+    <p class="ai-note">
+      Modulkonzept (letzte Wochen): Generative KI-Schicht erzeugt aus aggregierten KPIs eine natürlichsprachliche
+      Handlungsempfehlung – Wertschöpfungskette <em>Daten → Information → Wissen → Entscheidung</em> (Vercellis).
+      Erweiterbar via <code>fetch('https://api.anthropic.com/v1/messages', {model:'claude-sonnet-4-6'})</code>.
+    </p>
+    <button id="aiBtn" onclick="generateInsight()">✦ KI-Analyse generieren</button>
+    <div class="ai-out" id="aiOut">
+      Wähle Jahr, Kantonsgruppe und Herkunft, dann klicke „KI-Analyse generieren" für datenbasierte Entscheidungsunterstützung.
+    </div>
+  </div>
+
+  <!-- OLAP Drill-Down Tabelle: Quartal-Roll-Up -->
+  <div class="card">
+    <div class="card-head">
+      <strong>OLAP Drill-Down-Tabelle: Quartalsübersicht (Roll-Up Monat → Quartal)</strong>
+      <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+        <span class="tag">Roll-Up · Zeit-Hierarchie</span>
+        <button onclick="exportCSV()" style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.4);color:#10b981;padding:0.2rem 0.65rem;border-radius:5px;font-size:0.72rem;cursor:pointer">
+          ↓ CSV Export
+        </button>
+      </div>
+    </div>
+    <div id="drillTableWrap" style="overflow-x:auto"></div>
+    <!-- Korn / Granularität: DWH-Terminologie sichtbar im UI -->
+    <div style="margin-top:0.85rem;padding-top:0.7rem;border-top:1px solid var(--border);font-size:0.68rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:0.75rem;align-items:center">
+      <span><strong style="color:var(--accent2)">Korn (Granularität):</strong> 1 Datensatz = Kanton × Monat × Herkunft</span>
+      <span>·</span>
+      <span><strong style="color:var(--accent2)">Roll-Up-Hierarchie:</strong> Monat → Quartal → Jahr</span>
+      <span>·</span>
+      <span><strong style="color:var(--accent2)">Dimensionen:</strong> DIM_TIME · DIM_CANTON · DIM_ORIGIN</span>
+      <span>·</span>
+      <span><strong style="color:var(--accent2)">Faktentabelle:</strong> factOvernights (672 Datensätze: 8 × 7 × 12)</span>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <div>
+    <strong>Demonstrierte BI-Konzepte (Vercellis):</strong>
+    <span class="badge">ETL (Extract · Transform · Load)</span>
+    <span class="badge">Star Schema / Dimensionsmodell</span>
+    <span class="badge">OLAP Slice & Dice</span>
+    <span class="badge">Drill-Down</span>
+    <span class="badge">Roll-Up</span>
+    <span class="badge">KPI-Definition</span>
+    <span class="badge">Forecasting Holt-Winters</span>
+    <span class="badge">Saisonale Dekomposition</span>
+    <span class="badge">Agentic BI / NL-Insights</span>
+  </div>
+  <div>Quelle: BFS HESTA · FHNW BSc BIS/BKAI · Prof. Dr. M. Renold · 2025/26</div>
+</footer>
+
+<script>
+// ============================================================
+// BI-PROJEKT: Schweizer Hotellerie Dashboard
+// Modul:   Business Intelligence, FHNW BSc BIS/BKAI 2025/26
+// Dozent:  Prof. Dr. Manuel Renold
+// Lehrbuch: Carlo Vercellis, "Business Intelligence –
+//           Data Mining and Optimization for Decision Making"
+// Framework: Wertschöpfungskette Daten→Information→Wissen→Entscheidung
+// ============================================================
+
+
+// ============================================================
+// ETL – EXTRACT: Eingebetteter Daten-Snapshot
+// Quelle:        Bundesamt für Statistik (BFS),
+//                Beherbergungsstatistik (HESTA)
+// URL:           https://www.bfs.admin.ch/bfs/de/home/statistiken/
+//                tourismus/beherbergung/hotellerie.html
+// STAT-TAB API:  https://www.pxweb.bfs.admin.ch/api/v1/de/
+//                px-x-1003020000_101/  (Fallback: dieser Snapshot)
+// Snapshot-Datum: 2024-12-01
+// Metrik:        Monatliche Logiernächte (in Tausend)
+// Abdeckung:     8 Kantone, 2018–2024, Inland + Ausland
+// ============================================================
+
+
+// ============================================================
+// DIMENSIONSMODELL – STAR SCHEMA (Data Warehouse)
+// Faktentabelle: factOvernights
+//   Felder: { canton_id, year, month, total, domestic, international }
+//   Korn (Granularität): 1 Datensatz = 1 Kanton × 1 Monat × 1 Jahr
+// Dimensionstabellen:
+//   DIM_CANTON:  { id, name, type, intlShare }
+//   DIM_TIME:    abgeleitet aus year/month → quarter, season
+//   DIM_ORIGIN:  { TOTAL, DOM, INTL }
+// ============================================================
+
+// Dimensionstabelle: Kanton
+// intlShare = ECHTE DATEN BFS HESTA 2019: (Total − Inland) / Total
+// Quelle: BFS PxWeb API px-x-1003020000_102, abgerufen Juni 2026
+const DIM_CANTON = [
+  { id: 'GR', name: 'Graubünden', type: 'MOUNTAIN', intlShare: 0.390 }, // 2'047'894 / 5'256'016
+  { id: 'VS', name: 'Wallis',     type: 'MOUNTAIN', intlShare: 0.479 }, // 2'039'691 / 4'259'950
+  { id: 'BE', name: 'Bern',       type: 'LAKE',     intlShare: 0.578 }, // 3'258'870 / 5'634'247
+  { id: 'LU', name: 'Luzern',     type: 'LAKE',     intlShare: 0.670 }, // 1'485'656 / 2'217'819
+  { id: 'TI', name: 'Tessin',     type: 'LAKE',     intlShare: 0.381 }, //   880'787 / 2'309'518
+  { id: 'ZH', name: 'Zürich',     type: 'CITY',     intlShare: 0.678 }, // 4'040'698 / 5'960'145
+  { id: 'GE', name: 'Genf',       type: 'CITY',     intlShare: 0.807 }, // 2'582'385 / 3'202'974
+  { id: 'BS', name: 'Basel',      type: 'CITY',     intlShare: 0.665 }, //   946'681 / 1'423'481
+];
+
+// Basiswerte 2019 – ECHTE DATEN BFS HESTA (Logiernächte absolut, Jahrestotal)
+// Quelle: BFS PxWeb API px-x-1003020000_102, Indikator Logiernächte, Herkunftsland Total
+const BASE_ANNUAL_K = {
+  GR: 5256016,  // Graubünden
+  VS: 4259950,  // Wallis
+  BE: 5634247,  // Bern
+  LU: 2217819,  // Luzern
+  TI: 2309518,  // Tessin
+  ZH: 5960145,  // Zürich
+  GE: 3202974,  // Genf
+  BS: 1423481,  // Basel-Stadt
+};
+
+// Jahres-Wachstumsfaktoren (relative Skala zu 2019)
+// COVID-Schock 2020 abgebildet (-40.2%)
+// ECHTE DATEN: Jahresfaktoren relativ zu 2019 aus BFS HESTA
+// Berechnung: Σ(8 Kantone, Jahr X) / Σ(8 Kantone, 2019)
+const YEAR_FACTORS = {
+  2018: 0.977,  // 29'574'988 / 30'264'150
+  2019: 1.000,  // Referenzjahr: 30'264'150 Logiernächte
+  2020: 0.595,  // 17'993'790 – COVID-19 Lockdowns (−40.5%)
+  2021: 0.731,  // 22'138'797 – Teilöffnung, Inlandtourismus dominiert
+  2022: 0.973,  // 29'434'849 – Starke Erholung
+  2023: 1.067,  // 32'285'852 – Neues Rekordhoch
+  2024: 1.098,  // 33'241'916 – Weiteres Wachstum
+};
+const YEARS = Object.keys(YEAR_FACTORS).map(Number);
+
+// Jahresspezifischer Korrekturfaktor für Auslandanteil (intlShare)
+// COVID wirkt asymmetrisch: Grenzschliessungen treffen Auslandsgäste
+// unverhältnismässig stark (BFS: Auslandsgäste 2020 −65%, Inland −18%)
+// Quelle: BFS Medienmitteilung Beherbergungsstatistik 2020
+// ECHTE DATEN: Auslandanteil-Faktor pro Jahr, berechnet aus BFS HESTA
+// Formel: intlShare(Jahr) / intlShare(2019) über alle 8 Kantone aggregiert
+// intlShare 2019 Basis: 17'282'662 / 30'264'150 = 0.571
+const INTL_SHARE_YEAR_FACTOR = {
+  2018: 1.008, // 17'022'908 / 29'574'988 = 0.575 → 0.575/0.571
+  2019: 1.000, // Referenzjahr
+  2020: 0.560, // 5'752'811 / 17'993'790 = 0.320 → 0.320/0.571
+  2021: 0.529, // 6'696'517 / 22'138'797 = 0.302 → 0.302/0.571
+  2022: 0.835, // 14'029'150 / 29'434'849 = 0.477 → 0.477/0.571
+  2023: 0.932, // 17'181'167 / 32'285'852 = 0.532 → 0.532/0.571
+  2024: 0.950, // 18'035'935 / 33'241'916 = 0.543 → 0.543/0.571
+};
+
+// Saisonalitätsprofil (monatliche Faktoren, Jan–Dez)
+// ETL – Transform: Saisonale Dekomposition nach Kantontyp
+// Methode: Trend × Saison × Irregulär (Vercellis, Kap. Forecasting)
+const SEASONALITY = {
+  //          Jan    Feb    Mär    Apr    Mai    Jun    Jul    Aug    Sep    Okt    Nov    Dez
+  MOUNTAIN: [1.120, 1.285, 0.975, 0.518, 0.578, 1.018, 1.522, 1.578, 0.882, 0.578, 0.418, 1.082],
+  CITY:     [0.742, 0.768, 0.958, 1.028, 1.118, 1.072, 0.958, 0.942, 1.138, 1.062, 0.788, 0.698],
+  LAKE:     [0.838, 0.878, 0.928, 0.868, 1.018, 1.178, 1.382, 1.422, 1.038, 0.838, 0.678, 0.818],
+};
+
+
+// ============================================================
+// ETL – TRANSFORM: Generierung der Faktentabelle
+// Homogenisierung: Umrechnung Basis-Jahreswert → Monatswert
+// via saisonale Gewichtung (Summe der Faktoren = 12)
+// Normalisierung: Faktoren so skaliert, dass ∑(m=1..12)=12
+// Rauschen: reproduzierbares sin()-basiertes Störglied (±4%)
+//           zur Simulation realer Messvarianzen
+// ============================================================
+const factOvernights = [];
+
+for (const canton of DIM_CANTON) {
+  const seasonVec = SEASONALITY[canton.type];
+  // Normierung: ∑ seasonVec = 12 (sichert, dass Jahressumme = BASE_ANNUAL_K)
+  const normFactor = 12 / seasonVec.reduce((a, b) => a + b, 0);
+
+  for (const year of YEARS) {
+    const annualK = BASE_ANNUAL_K[canton.id] * YEAR_FACTORS[year];
+
+    for (let m = 1; m <= 12; m++) {
+      const seasonalWeight = seasonVec[m - 1] * normFactor;
+      // Reproduzierbares Rauschen (kein Math.random() → deterministisch)
+      const noise = 1 + Math.sin(canton.id.charCodeAt(0) * 7 + year * 3 + m * 11) * 0.038;
+      const total = Math.round((annualK / 12) * seasonalWeight * noise);
+      // Jahresspezifischer Auslandanteil: COVID senkt intlShare stark
+      const yearIntlShare = Math.min(canton.intlShare * (INTL_SHARE_YEAR_FACTOR[year] ?? 1), 0.95);
+      const intl  = Math.round(total * yearIntlShare);
+      const dom   = total - intl;
+
+      factOvernights.push({
+        canton_id: canton.id,
+        year,
+        month: m,
+        quarter: Math.ceil(m / 3),
+        season: [12,1,2].includes(m) ? 'Winter' : [3,4,5].includes(m) ? 'Frühling' : [6,7,8].includes(m) ? 'Sommer' : 'Herbst',
+        total,
+        domestic:      dom,
+        international: intl,
+      });
+    }
+  }
+}
+
+
+// ============================================================
+// ETL – LOAD: OLAP-Query-Engine (simulierter Cube)
+// Implementiert: Slice (year, canton, origin Filter)
+//                Roll-Up (Aggregation entlang Dimensionen)
+//                Drill-Down (Zugriff auf atomare Korn-Ebene)
+// ============================================================
+function olapQuery({ years = null, cantons = null, origin = 'TOTAL', groupBy = 'month' }) {
+  let rows = factOvernights;
+  if (years)   rows = rows.filter(r => years.includes(r.year));
+  if (cantons) rows = rows.filter(r => cantons.includes(r.canton_id));
+
+  const metric = r =>
+    origin === 'DOM'  ? r.domestic :
+    origin === 'INTL' ? r.international : r.total;
+
+  // Roll-Up: Aggregation nach groupBy-Dimension
+  const agg = {};
+  for (const r of rows) {
+    const key = groupBy === 'date'
+      ? `${r.year}-${String(r.month).padStart(2, '0')}`
+      : r[groupBy];
+    agg[key] = (agg[key] ?? 0) + metric(r);
+  }
+  return agg;
+}
+
+// Hilfsfunktion: Einzelnen Faktenwert herauslesen (Drill-Down auf Korn)
+function drillFact(canton_id, year, month, origin = 'TOTAL') {
+  const r = factOvernights.find(f => f.canton_id === canton_id && f.year === year && f.month === month);
+  if (!r) return 0;
+  return origin === 'DOM' ? r.domestic : origin === 'INTL' ? r.international : r.total;
+}
+
+
+// ============================================================
+// STATE: Aktuelle OLAP-Filter-Selektion
+// ============================================================
+const state = { year: 2023, region: 'ALL', origin: 'TOTAL' };
+
+function selectedCantons() {
+  if (state.region === 'ALL') return DIM_CANTON.map(c => c.id);
+  return DIM_CANTON.filter(c => c.type === state.region).map(c => c.id);
+}
+
+function updateState() {
+  state.year   = +document.getElementById('selYear').value;
+  state.region =  document.getElementById('selRegion').value;
+  state.origin =  document.getElementById('selOrigin').value;
+  render();
+}
+
+
+// ============================================================
+// KPI-DEFINITIONEN (Business Intelligence Layer)
+// Vercellis: KPIs sind verdichtete Kennzahlen mit direktem
+// Bezug zur Geschäftsentscheidung (operativ + strategisch)
+//
+// KPI 1: Logiernächte Total  – Formel: Σ(Logiernächte)
+// KPI 2: YoY-Wachstum        – Formel: (T₀−T₋₁)/T₋₁
+// KPI 3: Internationalisierungsrate – Ausland/Total
+// KPI 4: Saisonalitätsindex  – Peak(Monat)/Ø(Monat)
+// ============================================================
+function computeKPIs() {
+  const cantons = selectedCantons();
+
+  // Slice: aktuelles Jahr und Vorjahr
+  const curAgg  = olapQuery({ years: [state.year],     cantons, origin: state.origin });
+  const prevAgg = olapQuery({ years: [state.year - 1], cantons, origin: state.origin });
+
+  const curTotal  = Object.values(curAgg).reduce((a,b) => a+b, 0);
+  const prevTotal = Object.values(prevAgg).reduce((a,b) => a+b, 0);
+
+  // KPI 2: YoY-Wachstum
+  const yoy = prevTotal ? (curTotal - prevTotal) / prevTotal : 0;
+
+  // KPI 3: Internationalisierungsrate (immer auf TOTAL-Basis)
+  const totAll  = Object.values(olapQuery({ years:[state.year], cantons, origin:'TOTAL' })).reduce((a,b)=>a+b,0);
+  const totIntl = Object.values(olapQuery({ years:[state.year], cantons, origin:'INTL'  })).reduce((a,b)=>a+b,0);
+  const intlRate = totAll ? totIntl / totAll : 0;
+
+  // Drill-Down auf Kanton-Ebene (für Bar-Chart + Top-Kanton)
+  const byCantonK = {};
+  for (const id of cantons) {
+    const d = olapQuery({ years: [state.year], cantons: [id], origin: state.origin });
+    byCantonK[id] = Object.values(d).reduce((a,b) => a+b, 0);
+  }
+
+  const topId = Object.entries(byCantonK).sort((a,b) => b[1]-a[1])[0]?.[0];
+
+  // KPI 4: Saisonalitätsindex (Peak-Monat / Durchschnitt)
+  const monthlyVals = Object.values(curAgg);
+  const avgM = monthlyVals.reduce((a,b)=>a+b,0) / 12;
+  const peakM = Math.max(...monthlyVals);
+  const seasonIdx = avgM ? peakM / avgM : 1;
+
+  return { curTotal, prevTotal, yoy, intlRate, byCantonK, topId, seasonIdx, cantons, monthlyVals };
+}
+
+
+// ============================================================
+// RENDER: KPI-Cards
+// ============================================================
+function renderKPIs(kpis) {
+  const fmt   = n => n >= 1e6 ? (n/1e6).toFixed(2) + 'M' : (n/1e3).toFixed(1) + 'K';
+  const pct   = n => (n*100).toFixed(1) + '%';
+  const sign  = n => n >= 0 ? '+' : '';
+  const topName = DIM_CANTON.find(c => c.id === kpis.topId)?.name ?? '–';
+
+  document.getElementById('kpiGrid').innerHTML = `
+    <div class="kpi-card" style="--kpi-color:var(--accent)">
+      <div class="kpi-label">Logiernächte Total · ${state.year}</div>
+      <div class="kpi-value">${fmt(kpis.curTotal)}</div>
+      <div class="kpi-delta ${kpis.yoy>=0?'pos':'neg'}">${sign(kpis.yoy)}${pct(kpis.yoy)} ggü. ${state.year-1}</div>
+      <div class="kpi-formula">KPI 1: Σ(Logiernächte) · Quelle: BFS HESTA</div>
+    </div>
+    <div class="kpi-card" style="--kpi-color:${kpis.yoy>=0?'var(--pos)':'var(--neg)'}">
+      <div class="kpi-label">YoY-Wachstum</div>
+      <div class="kpi-value">${sign(kpis.yoy)}${pct(kpis.yoy)}</div>
+      <div class="kpi-delta ${kpis.yoy>=0?'pos':'neg'}">${fmt(kpis.curTotal)} vs. ${fmt(kpis.prevTotal)} (VJ)</div>
+      <div class="kpi-formula">KPI 2: (T₀ − T₋₁) / T₋₁ × 100 · Periodenvergleich</div>
+    </div>
+    <div class="kpi-card" style="--kpi-color:var(--purple)">
+      <div class="kpi-label">Internationalisierungsrate</div>
+      <div class="kpi-value">${pct(kpis.intlRate)}</div>
+      <div class="kpi-delta" style="color:var(--muted)">Ausländische Gäste an Total</div>
+      <div class="kpi-formula">KPI 3: Logiernächte Ausland / Total · Marktoffenheit</div>
+    </div>
+    <div class="kpi-card" style="--kpi-color:var(--warn)">
+      <div class="kpi-label">Saisonalitätsindex</div>
+      <div class="kpi-value">${kpis.seasonIdx.toFixed(2)}</div>
+      <div class="kpi-delta" style="color:var(--muted)">Top-Kanton: ${topName}</div>
+      <div class="kpi-formula">KPI 4: Peak(Monat) / Ø(Monat) · Off-Peak-Indikator</div>
+    </div>
+  `;
+}
+
+
+// ============================================================
+// NATIVE CANVAS CHART ENGINE – kein CDN erforderlich
+// Reine Canvas 2D API – ersetzt Chart.js komplett
+// ============================================================
+const THEME = { bg:'#1e293b', grid:'#263447', axis:'#64748b', text:'#94a3b8' };
+
+function initCanvas(id) {
+  const canvas = document.getElementById(id);
+  const W = canvas.parentElement.clientWidth  || 600;
+  const H = canvas.parentElement.clientHeight || 265;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = THEME.bg; ctx.fillRect(0, 0, W, H);
+  return { ctx, W, H };
+}
+
+
+// ============================================================
+// CHART 1: Liniendiagramm – Zeitreihe + Forecast
+// Methode: Holt-Winters doppelte exponentielle Glättung
+// Zerlegung: Ŷₜ = (Level + h·Trend) × SaisonFaktor[t mod L]
+// COVID-Annotation als vertikale Markierungslinie (Canvas)
+// ============================================================
+function renderTrendChart(kpis) {
+  const cantons = kpis.cantons;
+  const labels = [], actuals = [];
+  const allAgg = olapQuery({ cantons, origin: state.origin, groupBy: 'date' });
+  for (const y of YEARS) {
+    for (let m = 1; m <= 12; m++) {
+      const key = `${y}-${String(m).padStart(2,'0')}`;
+      labels.push(key);
+      actuals.push(allAgg[key] ?? 0);
+    }
+  }
+
+  // Holt-Winters Initialisierung
+  const L = 12, alpha = 0.30, beta = 0.10, gamma = 0.25;
+  const baseAvg = actuals.slice(0,L).reduce((a,b)=>a+b,0)/L || 1;
+  let s = actuals.slice(0,L).map(v => v/baseAvg);
+  let lvl = baseAvg;
+  let trd = ((actuals.slice(L,2*L).reduce((a,b)=>a+b,0)/L) - lvl) / L;
+  for (let i = 0; i < actuals.length; i++) {
+    const si = i % L, prev = lvl;
+    lvl   = alpha*(actuals[i]/(s[si]||1)) + (1-alpha)*(lvl+trd);
+    trd   = beta*(lvl-prev)               + (1-beta)*trd;
+    s[si] = gamma*(actuals[i]/(lvl||1))  + (1-gamma)*s[si];
+  }
+
+  const fcLabels=[], fcVals=[], fcLow=[], fcHigh=[];
+  for (let h=1; h<=12; h++) {
+    fcLabels.push(`2025-${String(h).padStart(2,'0')}`);
+    const fv = Math.max(0, Math.round((lvl+trd*h)*s[(actuals.length+h-1)%L]));
+    fcVals.push(fv); fcLow.push(Math.round(fv*0.92)); fcHigh.push(Math.round(fv*1.08));
+  }
+  const allLabels = [...labels, ...fcLabels];
+  const fcFull    = [...new Array(actuals.length).fill(null), ...fcVals];
+  const fcLowFull = [...new Array(actuals.length).fill(null), ...fcLow];
+  const fcHiFull  = [...new Array(actuals.length).fill(null), ...fcHigh];
+
+  const { ctx, W, H } = initCanvas('chartTrend');
+  const pad = {t:20,r:15,b:38,l:52};
+  const cW = W-pad.l-pad.r, cH = H-pad.t-pad.b;
+  const allV = [...actuals,...fcVals].filter(v=>v>0);
+  const maxY = (Math.max(...allV)||1)*1.1;
+  const xS = i => pad.l+(i/(allLabels.length-1))*cW;
+  const yS = v => pad.t+cH-(v/maxY)*cH;
+
+  // Y-Gitter
+  for (let t=0; t<=5; t++) {
+    const v=(maxY/5)*(5-t), y=yS(v);
+    ctx.strokeStyle=THEME.grid; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+cW,y); ctx.stroke();
+    ctx.fillStyle=THEME.axis; ctx.font='10px system-ui'; ctx.textAlign='right';
+    ctx.fillText((v/1000).toFixed(0)+'K', pad.l-5, y+4);
+  }
+  // X-Labels
+  ctx.fillStyle=THEME.axis; ctx.textAlign='center';
+  allLabels.forEach((l,i) => { if(l.endsWith('-01')) ctx.fillText(l.slice(0,4),xS(i),H-pad.b+14); });
+
+  // Forecast-Zone
+  const fc0=actuals.length;
+  ctx.fillStyle='rgba(245,158,11,0.05)';
+  ctx.fillRect(xS(fc0),pad.t,xS(allLabels.length-1)-xS(fc0),cH);
+
+  // Konfidenzband
+  ctx.fillStyle='rgba(245,158,11,0.09)'; ctx.beginPath();
+  let started=false;
+  fcHiFull.forEach((v,i) => { if(v==null)return; if(!started){ctx.moveTo(xS(i),yS(v));started=true;}else ctx.lineTo(xS(i),yS(v)); });
+  for(let i=allLabels.length-1;i>=fc0;i--){if(fcLowFull[i]!=null)ctx.lineTo(xS(i),yS(fcLowFull[i]));}
+  ctx.closePath(); ctx.fill();
+
+  // Ist-Linie
+  ctx.strokeStyle='#0ea5e9'; ctx.lineWidth=1.5; ctx.setLineDash([]);
+  ctx.beginPath(); actuals.forEach((v,i)=>{i===0?ctx.moveTo(xS(i),yS(v)):ctx.lineTo(xS(i),yS(v));}); ctx.stroke();
+
+  // Forecast-Linie
+  ctx.strokeStyle='#f59e0b'; ctx.lineWidth=2; ctx.setLineDash([5,3]);
+  ctx.beginPath(); started=false;
+  fcFull.forEach((v,i)=>{if(v==null)return;if(!started){ctx.moveTo(xS(i),yS(v));started=true;}else ctx.lineTo(xS(i),yS(v));});
+  ctx.stroke(); ctx.setLineDash([]);
+
+  // COVID-Annotationen
+  [{lbl:'2020-03',color:'rgba(239,68,68,0.85)',text:'⚠ COVID-19',yo:14},
+   {lbl:'2022-01',color:'rgba(16,185,129,0.75)',text:'↗ Erholung',yo:28}].forEach(a=>{
+    const idx=allLabels.indexOf(a.lbl); if(idx<0)return;
+    const x=xS(idx);
+    ctx.strokeStyle=a.color; ctx.lineWidth=1.5; ctx.setLineDash([4,3]);
+    ctx.beginPath(); ctx.moveTo(x,pad.t); ctx.lineTo(x,pad.t+cH); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle=a.color; ctx.font='bold 9px system-ui'; ctx.textAlign='left';
+    ctx.fillText(a.text,x+3,pad.t+a.yo);
+  });
+
+  // Legende
+  [{color:'#0ea5e9',label:'Ist-Werte',dash:[]},{color:'#f59e0b',label:'Forecast 2025 (Holt-Winters)',dash:[5,3]}].forEach((l,i)=>{
+    const lx=pad.l+i*210;
+    ctx.strokeStyle=l.color; ctx.lineWidth=2; ctx.setLineDash(l.dash);
+    ctx.beginPath(); ctx.moveTo(lx,11); ctx.lineTo(lx+18,11); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle=THEME.text; ctx.font='10px system-ui'; ctx.textAlign='left';
+    ctx.fillText(l.label,lx+22,15);
+  });
+}
+
+
+// ============================================================
+// CHART 2: Horizontales Balkendiagramm – Kanton-Ranking
+// OLAP Drill-Down: Region → Kanton
+// ============================================================
+function renderCantonChart(kpis) {
+  const sorted = Object.entries(kpis.byCantonK).sort((a,b)=>b[1]-a[1]);
+  const names  = sorted.map(([id])=>DIM_CANTON.find(c=>c.id===id)?.name??id);
+  const vals   = sorted.map(([,v])=>v);
+  const colors = vals.map((_,i)=>`hsl(${200+i*18},${70-i*3}%,${56-i*4}%)`);
+
+  const {ctx,W,H} = initCanvas('chartCanton');
+  const n=names.length; if(!n)return;
+  const pad={t:8,r:55,b:22,l:100};
+  const cW=W-pad.l-pad.r, cH=H-pad.t-pad.b;
+  const maxV=(Math.max(...vals)||1)*1.08;
+  const rowH=cH/n, barH=Math.max(10,rowH*0.62);
+
+  for(let t=0;t<=4;t++){
+    const v=(maxV/4)*t, x=pad.l+(v/maxV)*cW;
+    ctx.strokeStyle=THEME.grid; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x,pad.t); ctx.lineTo(x,pad.t+cH); ctx.stroke();
+    ctx.fillStyle=THEME.axis; ctx.font='10px system-ui'; ctx.textAlign='center';
+    ctx.fillText((v/1000).toFixed(0)+'K',x,H-6);
+  }
+
+  vals.forEach((v,i)=>{
+    const y=pad.t+i*rowH+(rowH-barH)/2, bW=(v/maxV)*cW;
+    ctx.fillStyle=colors[i];
+    ctx.beginPath();
+    ctx.roundRect?ctx.roundRect(pad.l,y,Math.max(bW,2),barH,3):ctx.rect(pad.l,y,Math.max(bW,2),barH);
+    ctx.fill();
+    ctx.fillStyle=THEME.text; ctx.font='11px system-ui'; ctx.textAlign='right';
+    ctx.fillText(names[i],pad.l-7,y+barH/2+4);
+    ctx.fillStyle='#cbd5e1'; ctx.textAlign='left'; ctx.font='10px system-ui';
+    ctx.fillText((v/1000).toFixed(0)+'K',pad.l+bW+5,y+barH/2+4);
+  });
+}
+
+
+// ============================================================
+// CHART 3: Gestapelter Balken – Inland vs. Ausland
+// OLAP Slice & Dice: Herkunfts-Dimension
+// ============================================================
+function renderOriginChart(kpis) {
+  const cantons=kpis.cantons;
+  const names=cantons.map(id=>DIM_CANTON.find(c=>c.id===id)?.name??id);
+  const domV =cantons.map(id=>Object.values(olapQuery({years:[state.year],cantons:[id],origin:'DOM' })).reduce((a,b)=>a+b,0));
+  const intlV=cantons.map(id=>Object.values(olapQuery({years:[state.year],cantons:[id],origin:'INTL'})).reduce((a,b)=>a+b,0));
+
+  const {ctx,W,H}=initCanvas('chartOrigin');
+  const n=names.length; if(!n)return;
+  const pad={t:28,r:55,b:22,l:100};
+  const cW=W-pad.l-pad.r, cH=H-pad.t-pad.b;
+  const totals=domV.map((v,i)=>v+intlV[i]);
+  const maxV=(Math.max(...totals)||1)*1.08;
+  const rowH=cH/n, barH=Math.max(10,rowH*0.62);
+
+  // Legende
+  [{c:'rgba(16,185,129,0.85)',l:'Inland'},{c:'rgba(14,165,233,0.85)',l:'Ausland'}].forEach((leg,i)=>{
+    const lx=pad.l+i*110;
+    ctx.fillStyle=leg.c; ctx.fillRect(lx,8,13,10);
+    ctx.fillStyle=THEME.text; ctx.font='10px system-ui'; ctx.textAlign='left';
+    ctx.fillText(leg.l,lx+16,17);
+  });
+
+  for(let t=0;t<=4;t++){
+    const v=(maxV/4)*t, x=pad.l+(v/maxV)*cW;
+    ctx.strokeStyle=THEME.grid; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x,pad.t); ctx.lineTo(x,pad.t+cH); ctx.stroke();
+    ctx.fillStyle=THEME.axis; ctx.font='10px system-ui'; ctx.textAlign='center';
+    ctx.fillText((v/1000).toFixed(0)+'K',x,H-6);
+  }
+
+  domV.forEach((dv,i)=>{
+    const iv=intlV[i], tot=dv+iv;
+    const y=pad.t+i*rowH+(rowH-barH)/2;
+    const w1=(dv/maxV)*cW, w2=(iv/maxV)*cW;
+    ctx.fillStyle='rgba(16,185,129,0.85)'; ctx.fillRect(pad.l,      y,Math.max(w1,1),barH);
+    ctx.fillStyle='rgba(14,165,233,0.85)'; ctx.fillRect(pad.l+w1,   y,Math.max(w2,1),barH);
+    ctx.fillStyle=THEME.text; ctx.font='11px system-ui'; ctx.textAlign='right';
+    ctx.fillText(names[i],pad.l-7,y+barH/2+4);
+    ctx.fillStyle='#cbd5e1'; ctx.textAlign='left'; ctx.font='10px system-ui';
+    ctx.fillText((tot/1000).toFixed(0)+'K',pad.l+w1+w2+5,y+barH/2+4);
+  });
+}
+
+
+// ============================================================
+// HEATMAP: Saisonalitätsmuster (Monat × Kanton)
+// OLAP Dice: Gleichzeitiger Schnitt auf 2 Dimensionen
+//            (Zeit-Dimension: Monat; Raum-Dimension: Kanton)
+// Farbe: Blau (kalt/niedrig) → Orange (warm/hoch)
+// ============================================================
+function renderHeatmap(kpis) {
+  const cantons = kpis.cantons;
+  const MONTHS  = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+
+  // Drill-Down auf Korn-Ebene: Kanton × Monat
+  const matrix = {};
+  const allVals = [];
+  for (const id of cantons) {
+    matrix[id] = [];
+    for (let m = 1; m <= 12; m++) {
+      const v = drillFact(id, state.year, m, state.origin);
+      matrix[id].push(v);
+      allVals.push(v);
+    }
+  }
+
+  const minV = Math.min(...allVals), maxV = Math.max(...allVals);
+
+  function cellColor(v) {
+    const t = (v - minV) / (maxV - minV || 1);
+    // Blau → Cyan → Orange Farbverlauf
+    const r = Math.round(14  + t * 231);
+    const g = Math.round(23  + t * 135);
+    const b = Math.round(120 - t * 80);
+    return `rgb(${r},${g},${b})`;
+  }
+
+  let html = '<table class="hm"><thead><tr><th>Kanton</th>';
+  MONTHS.forEach(m => { html += `<th>${m}</th>`; });
+  html += '</tr></thead><tbody>';
+
+  for (const id of cantons) {
+    const name = DIM_CANTON.find(c=>c.id===id)?.name ?? id;
+    html += `<tr><td class="canton-cell">${name}</td>`;
+    matrix[id].forEach(v => {
+      html += `<td style="background:${cellColor(v)};color:#fff">${(v/1000).toFixed(0)}K</td>`;
+    });
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  document.getElementById('heatmapWrap').innerHTML = html;
+}
+
+
+// ============================================================
+// DRILL-DOWN TABELLE: Quartalsübersicht
+// OLAP Roll-Up: Monat → Quartal (Hierarchie Zeit-Dimension)
+// Zeigt aggregierte Werte pro Quartal und Kanton
+// ============================================================
+function renderDrillTable(kpis) {
+  const cantons = kpis.cantons;
+  const qNames  = ['Q1 (Jan–Mär)', 'Q2 (Apr–Jun)', 'Q3 (Jul–Sep)', 'Q4 (Okt–Dez)'];
+  const qMonths = [[1,2,3],[4,5,6],[7,8,9],[10,11,12]];
+
+  let html = `<table class="drill"><thead><tr>
+    <th>Quartal</th>
+    ${cantons.map(id => `<th>${DIM_CANTON.find(c=>c.id===id)?.name??id}</th>`).join('')}
+    <th>Total</th>
+  </tr></thead><tbody>`;
+
+  for (let q = 0; q < 4; q++) {
+    const months = qMonths[q];
+    let rowTotal = 0;
+    const cells = cantons.map(id => {
+      const v = months.reduce((a, m) => a + drillFact(id, state.year, m, state.origin), 0);
+      rowTotal += v;
+      return `<td>${(v/1000).toFixed(0)}K</td>`;
+    });
+    html += `<tr><td>${qNames[q]}</td>${cells.join('')}<td class="total-col">${(rowTotal/1000).toFixed(0)}K</td></tr>`;
+  }
+
+  // Jahressumme (Roll-Up auf Jahr-Ebene)
+  const yearTotals = cantons.map(id =>
+    [1,2,3,4,5,6,7,8,9,10,11,12].reduce((a,m) => a + drillFact(id, state.year, m, state.origin), 0)
+  );
+  const grandTotal = yearTotals.reduce((a,b)=>a+b, 0);
+  html += `<tr style="font-weight:700;background:rgba(14,165,233,0.06)">
+    <td style="color:var(--accent2)">Jahrestotal</td>
+    ${yearTotals.map(v=>`<td style="color:var(--accent2)">${(v/1000).toFixed(0)}K</td>`).join('')}
+    <td class="total-col">${(grandTotal/1000).toFixed(0)}K</td>
+  </tr>`;
+
+  html += '</tbody></table>';
+  document.getElementById('drillTableWrap').innerHTML = html;
+}
+
+
+// ============================================================
+// AGENTIC BI – Natural Language Insight Engine
+// Konzept: Generative KI-Schicht über aggregierten KPIs
+// Implementierung: Regelbasierte NL-Generierung (deterministic)
+// Architektur für Erweiterung mit Anthropic API:
+//   const res = await fetch('https://api.anthropic.com/v1/messages', {
+//     method: 'POST',
+//     headers: { 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01',
+//                'content-type': 'application/json' },
+//     body: JSON.stringify({
+//       model: 'claude-sonnet-4-6', max_tokens: 400,
+//       messages: [{ role:'user', content:
+//         `Analysiere diese Schweizer Hotellerie-KPIs und gib eine Entscheidungsempfehlung:
+//          Jahr: ${state.year}, Region: ${state.region},
+//          Logiernächte: ${kpis.curTotal}, YoY: ${kpis.yoy},
+//          Internationalisierungsrate: ${kpis.intlRate},
+//          Saisonalitätsindex: ${kpis.seasonIdx}` }]
+//     })
+//   });
+// ============================================================
+async function generateInsight() {
+  const btn = document.getElementById('aiBtn');
+  const out  = document.getElementById('aiOut');
+  btn.disabled = true;
+  out.innerHTML = '<span style="color:var(--muted)">⟳ Aggregiere KPIs und generiere Insight…</span>';
+
+  // Simulierte LLM-Latenz (würde bei echter API entfallen)
+  await new Promise(r => setTimeout(r, 900));
+
+  const kpis = computeKPIs();
+  const regionLabel = {ALL:'Schweizer Hotellerie gesamt', MOUNTAIN:'Bergkantone (GR, VS)', CITY:'Stadtkantone (ZH, GE, BS)', LAKE:'See- & Alpenkantone (BE, LU, TI)'}[state.region];
+  const originLabel = {TOTAL:'gesamt', DOM:'Inlandsgäste', INTL:'Auslandsgäste'}[state.origin];
+  const topName = DIM_CANTON.find(c => c.id === kpis.topId)?.name ?? '–';
+  const sign = n => n >= 0 ? '+' : '';
+  const pct  = n => (n*100).toFixed(1)+'%';
+
+  // Regelbasierte Insight-Generierung (NL)
+  let trendText = kpis.yoy > 0.05
+    ? `Das starke Wachstum von <strong>${sign(kpis.yoy)}${pct(kpis.yoy)}</strong> gegenüber ${state.year-1} übertrifft den langjährigen Durchschnitt (+2–3%) deutlich und signalisiert eine robuste Nachfragedynamik.`
+    : kpis.yoy > 0
+    ? `Das moderate Wachstum von <strong>${sign(kpis.yoy)}${pct(kpis.yoy)}</strong> gegenüber ${state.year-1} liegt im Rahmen des saisonbereinigten Trendwachstums.`
+    : `Der Rückgang von <strong>${sign(kpis.yoy)}${pct(kpis.yoy)}</strong> gegenüber ${state.year-1} erfordert eine strukturierte Ursachenanalyse (Makro, Wechselkurs, Konkurrenz).`;
+
+  let intlText = kpis.intlRate > 0.65
+    ? `Die <strong>Internationalisierungsrate von ${pct(kpis.intlRate)}</strong> signalisiert hohe Abhängigkeit von ausländischen Märkten. Wechselkursschwankungen (EUR/CHF, USD/CHF) wirken direkt auf die Logiernächte. Empfehlung: Diversifizierung Quellmärkte, Stärkung Inlandsnachfrage.`
+    : kpis.intlRate > 0.45
+    ? `Die <strong>Internationalisierungsrate von ${pct(kpis.intlRate)}</strong> spiegelt einen gesunden Mix aus in- und ausländischen Gästen wider – resilient gegenüber einzelnen Marktschocks.`
+    : `Die <strong>Internationalisierungsrate von ${pct(kpis.intlRate)}</strong> weist auf Inlandsfokus hin. Wachstumspotenzial durch gezielte Auslandsmärkte (D, UK, US, CN) erschliessbar.`;
+
+  let seasonText = kpis.seasonIdx > 1.6
+    ? `Der <strong>Saisonalitätsindex von ${kpis.seasonIdx.toFixed(2)}</strong> zeigt ausgeprägte Spitzenzeiten. Off-Peak-Pakete (Schönwetter-Garantie, Corporate-Rates) können Kapazitäten glätten und den RevPAR stabilisieren.`
+    : `Mit <strong>Saisonalitätsindex ${kpis.seasonIdx.toFixed(2)}</strong> ist die Nachfrage relativ gleichmässig verteilt – effiziente Kapazitätsplanung möglich.`;
+
+  let decision = kpis.yoy < 0
+    ? 'Investition in Off-Peak-Marketing und Pauschalangebote für Inlandsmarkt priorisieren.'
+    : kpis.intlRate > 0.65
+    ? 'Quellmarkt-Diversifizierung (z.B. Middle East, Indien) als strategisches Risikomanagement.'
+    : 'Skalierung bestehender Stärken: Premium-Segment stärken, digitale Distribution ausbauen.';
+
+  out.innerHTML = `
+    <p style="margin-bottom:0.7rem;color:var(--muted);font-size:0.75rem">
+      Insight für <strong style="color:var(--text)">${regionLabel}</strong> · ${originLabel} · Jahr <strong style="color:var(--text)">${state.year}</strong>
+    </p>
+    <p style="margin-bottom:0.6rem">${trendText}</p>
+    <p style="margin-bottom:0.6rem">${intlText}</p>
+    <p style="margin-bottom:0.6rem">${seasonText}</p>
+    <p style="margin-bottom:0.6rem">
+      <strong>Spitzendestination:</strong> ${topName} mit
+      <strong>${((kpis.byCantonK[kpis.topId]??0)/1000).toFixed(0)}K Logiernächten</strong>
+      (${(((kpis.byCantonK[kpis.topId]??0)/kpis.curTotal)*100).toFixed(0)}% des regionalen Totals).
+      ${state.year === 2020 ? ' ⚠️ COVID-19-Jahr: Alle Werte stark durch Lockdowns und Grenzschliessungen beeinflusst.' : ''}
+    </p>
+    <div style="border-top:1px solid var(--border);padding-top:0.65rem;margin-top:0.5rem">
+      <span style="color:var(--accent2);font-weight:600">💡 Entscheidungsempfehlung:</span>
+      <span style="color:var(--text)"> ${decision}</span>
+    </div>
+    <p style="color:var(--muted);font-size:0.68rem;margin-top:0.75rem">
+      Architekturhinweis: Diese Schicht ist regelbasiert implementiert. Für echte generative KI:
+      POST an <code>api.anthropic.com/v1/messages</code> mit <code>claude-sonnet-4-6</code>,
+      KPI-Aggregat als System-Kontext. Antwort ersetzt diesen Block. (Vercellis: Daten→Info→Wissen→Entscheidung)
+    </p>
+  `;
+  btn.disabled = false;
+}
+
+
+// ============================================================
+// CSV EXPORT – ETL Load-Schicht: Datenexport für Weiterverarbeitung
+// Exportiert aggregierte Quartals-Daten der aktuellen OLAP-Selektion
+// Korn: Quartal × Kanton × Herkunft (Roll-Up aus Monatsebene)
+// ============================================================
+function exportCSV() {
+  const cantons  = selectedCantons();
+  const qNames   = ['Q1','Q2','Q3','Q4'];
+  const qMonths  = [[1,2,3],[4,5,6],[7,8,9],[10,11,12]];
+  const originLabel = { TOTAL:'Gesamt', DOM:'Inland', INTL:'Ausland' }[state.origin];
+
+  const headers = ['Jahr', 'Quartal', 'Herkunft',
+    ...cantons.map(id => DIM_CANTON.find(c=>c.id===id)?.name ?? id),
+    'Total'
+  ];
+
+  const rows = [];
+  for (let q = 0; q < 4; q++) {
+    let rowTotal = 0;
+    const vals = cantons.map(id => {
+      const v = qMonths[q].reduce((a,m) => a + drillFact(id, state.year, m, state.origin), 0);
+      rowTotal += v;
+      return v;
+    });
+    rows.push([state.year, qNames[q], originLabel, ...vals, rowTotal]);
+  }
+
+  // Jahrestotal-Zeile
+  const yearTotals = cantons.map(id =>
+    [1,2,3,4,5,6,7,8,9,10,11,12].reduce((a,m) => a + drillFact(id, state.year, m, state.origin), 0)
+  );
+  rows.push([state.year, 'Gesamt', originLabel, ...yearTotals, yearTotals.reduce((a,b)=>a+b,0)]);
+
+  const csv = [headers, ...rows].map(r => r.join(';')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }); // BOM für Excel
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), {
+    href: url,
+    download: `hesta_${state.year}_${state.region}_${state.origin}.csv`
+  });
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+
+// ============================================================
+// MASTER RENDER: Alle Komponenten konsistent aktualisieren
+// Ein Filter-Event (OLAP Slice) triggert vollständigen Re-Render
+// Sichert OLAP-Konsistenz über alle Visualisierungen
+// ============================================================
+function render() {
+  const kpis = computeKPIs();
+  renderKPIs(kpis);
+  renderTrendChart(kpis);
+  renderCantonChart(kpis);
+  renderOriginChart(kpis);
+  renderHeatmap(kpis);
+  renderDrillTable(kpis);
+  // AI-Panel zurücksetzen bei Filteränderung
+  document.getElementById('aiOut').innerHTML =
+    'Klicke „KI-Analyse generieren" um einen Insight für die aktuelle Selektion zu erhalten.';
+}
+
+
+// ============================================================
+// INITIALISIERUNG: Dashboard starten
+// ============================================================
+function init() {
+  // Jahres-Dropdown befüllen (ETL-Zeitraum)
+  const sel = document.getElementById('selYear');
+  YEARS.forEach(y => {
+    const o = document.createElement('option');
+    o.value = y; o.textContent = y;
+    if (y === 2023) o.selected = true;
+    sel.appendChild(o);
+  });
+
+  // Event-Listener für OLAP-Controls
+  ['selYear','selRegion','selOrigin'].forEach(id => {
+    document.getElementById(id).addEventListener('change', updateState);
+  });
+
+  // Initial-Render
+  render();
+}
+
+init();
+</script>
+</body>
+</html>
