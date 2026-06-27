@@ -31,7 +31,7 @@ index.html   →   Doppelklick im Datei-Explorer ODER
                  in einem Browser öffnen (Chrome / Firefox / Edge)
 ```
 
-Alle Abhängigkeiten werden via CDN geladen (Chart.js 4.4). Daten sind als Snapshot eingebettet – **funktioniert offline**.
+Keine externen Bibliotheken – alle Visualisierungen mit nativer Canvas 2D API. Daten sind eingebettet – **funktioniert offline**.
 
 ---
 
@@ -41,18 +41,19 @@ Alle Abhängigkeiten werden via CDN geladen (Chart.js 4.4). Daten sind als Snaps
 |----------|------|
 | Quelle | Bundesamt für Statistik (BFS), Beherbergungsstatistik (HESTA) |
 | URL | https://www.bfs.admin.ch/bfs/de/home/statistiken/tourismus/beherbergung/hotellerie.html |
-| API (Referenz) | https://www.pxweb.bfs.admin.ch/api/v1/de/px-x-1003020000_101/ |
-| Eingebettet als | Datierter Snapshot (2024-12-01) mit reproduzierbarer Generierungslogik |
-| Zeitraum | 2018–2024 (monatlich), Forecast 2025 |
+| API | https://www.pxweb.bfs.admin.ch/api/v1/de/px-x-1003020000_102/ |
+| Datensatz | px-x-1003020000_102: Logiernächte nach Jahr, Monat, Kanton, Herkunftsland |
+| Abruf | Juni 2026 via BFS PxWeb REST-API (JSON) |
+| Zeitraum | 2018–2024 (Jahrestotale), Forecast 2025 (Holt-Winters) |
 | Kantone | GR, VS, BE, LU, TI, ZH, GE, BS (8 grösste Tourismusdestinationen) |
-| Metrik | Monatliche Logiernächte in Tausend, aufgeteilt in Inland / Ausland |
+| Metrik | Logiernächte absolut (z.B. ZH 2019: 5'960'145), aufgeteilt in Inland / Ausland |
 
 ---
 
 ## Demonstrierte BI-Konzepte
 
 ### 1. Datenintegration & ETL
-- **Extract**: Eingebetteter BFS HESTA Snapshot (mit Quell-URL und Abrufdatum im Code)
+- **Extract**: Echte BFS HESTA Jahrestotale via PxWeb REST-API abgerufen (px-x-1003020000_102, Juni 2026) und als verifizierbare Konstanten eingebettet
 - **Transform**: Homogenisierung der Daten, saisonale Normierung (∑ Faktoren = 12), Berechnung abgeleiteter Metriken (Inland/Ausland-Split)
 - **Load**: In-Memory Faktentabelle `factOvernights[]` mit vollständiger Granularität
 
@@ -120,7 +121,7 @@ DIM_ORIGIN ────── FACT_OVERNIGHTS ────── DIM_CANTON
 ```
 BI-Projekt/
 └── index.html        # Vollständige Single-Page-Anwendung
-                      # HTML + CSS + JS (Chart.js via CDN)
+                      # HTML + CSS + JS (keine externen Bibliotheken)
                       # Enthält: ETL, Dimensionsmodell, OLAP-Engine,
                       #          KPI-Logik, Forecast, AI-Insights
 ```
@@ -141,7 +142,7 @@ Das Dashboard demonstriert folgende **Modulkonzepte** (alle explizit im Code kom
 - **Agentic BI / NL-Schicht**: Regelbasierte Entscheidungsempfehlungen aus KPI-Aggregaten; Erweiterung via Anthropic API (`claude-sonnet-4-6`) im Code dokumentiert
 - Konsistente **OLAP-Interaktion**: Ein Filter (Jahr/Region/Herkunft) aktualisiert simultan alle 6 Visualisierungen und alle 4 KPI-Cards
 
-Der **COVID-Schock 2020** (−40.2% Logiernächte) ist als markanter Bruchpunkt in der Zeitreihe sichtbar und dient als eindrückliches Beispiel für externe Schocks in BI-Systemen. Jahresfilter auf 2020 zeigt, wie alle KPIs konsistent reagieren.
+Der **COVID-Schock 2020** (−40.5% Logiernächte, BFS-belegt) ist als markanter Bruchpunkt in der Zeitreihe sichtbar und dient als eindrückliches Beispiel für externe Schocks in BI-Systemen. Jahresfilter auf 2020 zeigt, wie alle KPIs konsistent reagieren.
 
 ---
 
